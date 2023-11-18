@@ -28,8 +28,6 @@ func (i *arrayImports) Set(value string) error {
 const TEMPLATE = `package main
 
 import (
-	"fmt"
-
 	m "{{ .ModelsPackage }}"
 	"github.com/tkrajina/typescriptify-golang-structs/typescriptify"
 )
@@ -47,7 +45,6 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
-	fmt.Println("OK")
 }`
 
 type Params struct {
@@ -74,7 +71,6 @@ func main() {
 	structs := []string{}
 	for _, structOrGoFile := range flag.Args() {
 		if strings.HasSuffix(structOrGoFile, ".go") {
-			fmt.Println("Parsing:", structOrGoFile)
 			fileStructs, err := GetGolangFileStructs(structOrGoFile)
 			if err != nil {
 				panic(fmt.Sprintf("Error loading/parsing golang file %s: %s", structOrGoFile, err.Error()))
@@ -128,13 +124,11 @@ func main() {
 	}
 
 	cmd := exec.Command("go", "run", f.Name())
-	fmt.Println(strings.Join(cmd.Args, " "))
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		fmt.Println(string(output))
 		handleErr(err)
 	}
-	fmt.Println(string(output))
 }
 
 func GetGolangFileStructs(filename string) ([]string, error) {
