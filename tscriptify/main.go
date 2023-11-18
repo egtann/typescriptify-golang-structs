@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"text/template"
 	"unicode"
@@ -28,10 +29,9 @@ func (i *arrayImports) Set(value string) error {
 const TEMPLATE = `package main
 
 import (
-	"fmt"
-
-	m "{{ .ModelsPackage }}"
-	"github.com/tkrajina/typescriptify-golang-structs/typescriptify"
+	{{ .Models }}
+	"github.com/egtann/typescriptify-golang-structs/typescriptify"
+{{ .ExtraImports }}
 )
 
 func main() {
@@ -43,11 +43,27 @@ func main() {
 {{ end }}
 {{ range .CustomImports }}	t.AddImport("{{ . }}")
 {{ end }}
+	{{ .ExtraCommands }}
 	err := t.ConvertToFile("{{ .TargetFile }}")
 	if err != nil {
 		panic(err.Error())
 	}
-	fmt.Println("OK")
+}
+
+type enum[T any] struct {
+	Value  T
+	TSName string
+}
+
+func stringEnum[T ~string](xs []T) []enum[T] {
+	out := make([]enum[T], 0, len(xs))
+	for _, x := range xs {
+		out = append(out, enum[T]{
+			Value: x,
+			TSName: string(x),
+		})
+	}
+	return out
 }`
 
 type Params struct {
@@ -58,6 +74,10 @@ type Params struct {
 	CustomImports arrayImports
 	Interface     bool
 	Verbose       bool
+	ExtraImports  string
+	ExtraCommands string
+
+	Models string
 }
 
 func main() {
@@ -65,6 +85,8 @@ func main() {
 	var backupDir string
 	flag.StringVar(&p.ModelsPackage, "package", "", "Path of the package with models")
 	flag.StringVar(&p.TargetFile, "target", "", "Target typescript file")
+	flag.StringVar(&p.ExtraImports, "extra-imports", "", "Filename containing extra imports to include in the generated file")
+	flag.StringVar(&p.ExtraCommands, "extra-commands", "", "Filename containing extra content to include in the generated file")
 	flag.StringVar(&backupDir, "backup", "", "Directory where backup files are saved")
 	flag.BoolVar(&p.Interface, "interface", false, "Create interfaces (not classes)")
 	flag.Var(&p.CustomImports, "import", "Typescript import for your custom type, repeat this option for each import needed")
@@ -72,16 +94,25 @@ func main() {
 	flag.Parse()
 
 	structs := []string{}
+	paths := map[string]int{}
 	for _, structOrGoFile := range flag.Args() {
-		if strings.HasSuffix(structOrGoFile, ".go") {
-			fmt.Println("Parsing:", structOrGoFile)
-			fileStructs, err := GetGolangFileStructs(structOrGoFile)
-			if err != nil {
-				panic(fmt.Sprintf("Error loading/parsing golang file %s: %s", structOrGoFile, err.Error()))
-			}
-			structs = append(structs, fileStructs...)
-		} else {
+		if !strings.HasSuffix(structOrGoFile, ".go") {
 			structs = append(structs, structOrGoFile)
+			continue
+		}
+		path := filepath.Dir(filepath.Join(p.ModelsPackage, structOrGoFile))
+		n, exist := paths[path]
+		if !exist {
+			paths[path] = len(paths)
+			n = paths[path]
+		}
+		fileStructs, err := GetGolangFileStructs(structOrGoFile)
+		if err != nil {
+			panic(fmt.Sprintf("Error loading/parsing golang file %s: %s", structOrGoFile, err.Error()))
+		}
+		sort.Strings(fileStructs)
+		for _, s := range fileStructs {
+			structs = append(structs, fmt.Sprintf("m%d.%s", n, s))
 		}
 	}
 
@@ -110,7 +141,7 @@ func main() {
 			continue
 		}
 		if len(str) > 0 {
-			structsArr = append(structsArr, "m."+str)
+			structsArr = append(structsArr, str)
 		}
 	}
 
@@ -118,6 +149,23 @@ func main() {
 	p.InitParams = map[string]interface{}{
 		"BackupDir": fmt.Sprintf(`"%s"`, backupDir),
 	}
+
+	if p.ExtraImports != "" {
+		byt, err := os.ReadFile(p.ExtraImports)
+		handleErr(err)
+		p.ExtraImports = string(byt)
+	}
+	if p.ExtraCommands != "" {
+		byt, err := os.ReadFile(p.ExtraCommands)
+		handleErr(err)
+		p.ExtraCommands = string(byt)
+	}
+
+	models := make([]string, 0, len(paths))
+	for k, v := range paths {
+		models = append(models, fmt.Sprintf("m%d %q", v, k))
+	}
+	p.Models = strings.Join(models, "\n\t")
 	err = t.Execute(f, p)
 	handleErr(err)
 
@@ -128,13 +176,11 @@ func main() {
 	}
 
 	cmd := exec.Command("go", "run", f.Name())
-	fmt.Println(strings.Join(cmd.Args, " "))
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		fmt.Println(string(output))
 		handleErr(err)
 	}
-	fmt.Println(string(output))
 }
 
 func GetGolangFileStructs(filename string) ([]string, error) {
