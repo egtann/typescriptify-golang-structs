@@ -103,6 +103,9 @@ func main() {
 	structsArr := make([]string, 0)
 	for _, str := range structs {
 		str = strings.TrimSpace(str)
+		if strings.HasPrefix(str, ".") {
+			continue
+		}
 		if strings.Contains(str, string(filepath.Separator)) {
 			continue
 		}
