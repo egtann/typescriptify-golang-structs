@@ -28,7 +28,7 @@ func (i *arrayImports) Set(value string) error {
 const TEMPLATE = `package main
 
 import (
-	m "{{ .ModelsPackage }}"
+	{{ .Models }}
 	"github.com/tkrajina/typescriptify-golang-structs/typescriptify"
 )
 
@@ -55,6 +55,8 @@ type Params struct {
 	CustomImports arrayImports
 	Interface     bool
 	Verbose       bool
+
+	Models string
 }
 
 func main() {
@@ -69,15 +71,24 @@ func main() {
 	flag.Parse()
 
 	structs := []string{}
+	paths := map[string]int{}
 	for _, structOrGoFile := range flag.Args() {
-		if strings.HasSuffix(structOrGoFile, ".go") {
-			fileStructs, err := GetGolangFileStructs(structOrGoFile)
-			if err != nil {
-				panic(fmt.Sprintf("Error loading/parsing golang file %s: %s", structOrGoFile, err.Error()))
-			}
-			structs = append(structs, fileStructs...)
-		} else {
+		if !strings.HasSuffix(structOrGoFile, ".go") {
 			structs = append(structs, structOrGoFile)
+			continue
+		}
+		path := filepath.Dir(filepath.Join(p.ModelsPackage, structOrGoFile))
+		n, exist := paths[path]
+		if !exist {
+			paths[path] = len(paths)
+			n = paths[path]
+		}
+		fileStructs, err := GetGolangFileStructs(structOrGoFile)
+		if err != nil {
+			panic(fmt.Sprintf("Error loading/parsing golang file %s: %s", structOrGoFile, err.Error()))
+		}
+		for _, s := range fileStructs {
+			structs = append(structs, fmt.Sprintf("m%d.%s", n, s))
 		}
 	}
 
@@ -106,7 +117,7 @@ func main() {
 			continue
 		}
 		if len(str) > 0 {
-			structsArr = append(structsArr, "m."+str)
+			structsArr = append(structsArr, str)
 		}
 	}
 
@@ -114,6 +125,12 @@ func main() {
 	p.InitParams = map[string]interface{}{
 		"BackupDir": fmt.Sprintf(`"%s"`, backupDir),
 	}
+
+	models := make([]string, 0, len(paths))
+	for k, v := range paths {
+		models = append(models, fmt.Sprintf("m%d %q", v, k))
+	}
+	p.Models = strings.Join(models, "\n\t")
 	err = t.Execute(f, p)
 	handleErr(err)
 
