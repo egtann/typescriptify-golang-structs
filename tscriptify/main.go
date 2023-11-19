@@ -30,6 +30,7 @@ const TEMPLATE = `package main
 import (
 	{{ .Models }}
 	"github.com/tkrajina/typescriptify-golang-structs/typescriptify"
+{{ .ExtraImports }}
 )
 
 func main() {
@@ -41,6 +42,7 @@ func main() {
 {{ end }}
 {{ range .CustomImports }}	t.AddImport("{{ . }}")
 {{ end }}
+	{{ .ExtraCommands }}
 	err := t.ConvertToFile("{{ .TargetFile }}")
 	if err != nil {
 		panic(err.Error())
@@ -55,6 +57,8 @@ type Params struct {
 	CustomImports arrayImports
 	Interface     bool
 	Verbose       bool
+	ExtraImports  string
+	ExtraCommands string
 
 	Models string
 }
@@ -64,6 +68,8 @@ func main() {
 	var backupDir string
 	flag.StringVar(&p.ModelsPackage, "package", "", "Path of the package with models")
 	flag.StringVar(&p.TargetFile, "target", "", "Target typescript file")
+	flag.StringVar(&p.ExtraImports, "extra-imports", "", "Filename containing extra imports to include in the generated file")
+	flag.StringVar(&p.ExtraCommands, "extra-commands", "", "Filename containing extra content to include in the generated file")
 	flag.StringVar(&backupDir, "backup", "", "Directory where backup files are saved")
 	flag.BoolVar(&p.Interface, "interface", false, "Create interfaces (not classes)")
 	flag.Var(&p.CustomImports, "import", "Typescript import for your custom type, repeat this option for each import needed")
@@ -124,6 +130,17 @@ func main() {
 	p.Structs = structsArr
 	p.InitParams = map[string]interface{}{
 		"BackupDir": fmt.Sprintf(`"%s"`, backupDir),
+	}
+
+	if p.ExtraImports != "" {
+		byt, err := os.ReadFile(p.ExtraImports)
+		handleErr(err)
+		p.ExtraImports = string(byt)
+	}
+	if p.ExtraCommands != "" {
+		byt, err := os.ReadFile(p.ExtraCommands)
+		handleErr(err)
+		p.ExtraCommands = string(byt)
 	}
 
 	models := make([]string, 0, len(paths))
