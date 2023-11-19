@@ -47,6 +47,22 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
+}
+
+type enum[T any] struct {
+	Value  T
+	TSName string
+}
+
+func stringEnum[T ~string](xs []T) []enum[T] {
+	out := make([]enum[T], 0, len(xs))
+	for _, x := range xs {
+		out = append(out, enum[T]{
+			Value: x,
+			TSName: string(x),
+		})
+	}
+	return out
 }`
 
 type Params struct {
