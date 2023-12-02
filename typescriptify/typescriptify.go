@@ -17,8 +17,8 @@ const (
 	tsTransformTag      = "ts_transform"
 	tsType              = "ts_type"
 	tsConvertValuesFunc = `convertValues(a: any, classs: any, asMap: boolean = false): any {
-	if (!a) {
-		return a;
+	if (a == null) {
+		return null;
 	}
 	if (a.slice) {
 		return (a as any[]).map(elem => this.convertValues(elem, classs));

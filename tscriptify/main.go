@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"text/template"
 	"unicode"
@@ -109,6 +110,7 @@ func main() {
 		if err != nil {
 			panic(fmt.Sprintf("Error loading/parsing golang file %s: %s", structOrGoFile, err.Error()))
 		}
+		sort.Strings(fileStructs)
 		for _, s := range fileStructs {
 			structs = append(structs, fmt.Sprintf("m%d.%s", n, s))
 		}
