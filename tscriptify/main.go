@@ -30,7 +30,7 @@ const TEMPLATE = `package main
 
 import (
 	{{ .Models }}
-	"github.com/tkrajina/typescriptify-golang-structs/typescriptify"
+	"github.com/egtann/typescriptify-golang-structs/typescriptify"
 {{ .ExtraImports }}
 )
 
