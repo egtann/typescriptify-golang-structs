@@ -100,15 +100,19 @@ func main() {
 			structs = append(structs, structOrGoFile)
 			continue
 		}
-		path := filepath.Dir(filepath.Join(p.ModelsPackage, structOrGoFile))
+		gofile := structOrGoFile
+		if strings.HasSuffix(gofile, "_test.go") {
+			continue
+		}
+		path := filepath.Dir(filepath.Join(p.ModelsPackage, gofile))
 		n, exist := paths[path]
 		if !exist {
 			paths[path] = len(paths)
 			n = paths[path]
 		}
-		fileStructs, err := GetGolangFileStructs(structOrGoFile)
+		fileStructs, err := GetGolangFileStructs(gofile)
 		if err != nil {
-			panic(fmt.Sprintf("Error loading/parsing golang file %s: %s", structOrGoFile, err.Error()))
+			panic(fmt.Sprintf("Error loading/parsing golang file %s: %s", gofile, err.Error()))
 		}
 		sort.Strings(fileStructs)
 		for _, s := range fileStructs {
